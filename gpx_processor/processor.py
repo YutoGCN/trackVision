@@ -53,25 +53,11 @@ class processor:
                             break
 
     class sequence_generator:
-        """
-            Generate track sequence dataframe from track points
-
-            Parameters
-            ----------
-            df : pandas.DataFrame
-                [latitude   longitude   elevation   time    time_diff   rest    reach]
-
-            Returns
-            -------
-            df : pandas.DataFrame
-                [node_name arrival_time departure_time ]
-        """
         def calc_time(df):
             if len(df) == 0:
                 return pd.DataFrame(columns=['node_name', 'arrival_time', 'departure_time'])
 
             sequence_list = []
-            sequence_list.append(['node_name', 'arrival_time', 'departure_time'])
 
             current_node = df.iloc[0]['reach']
             arrival_time = None
@@ -89,12 +75,54 @@ class processor:
             # Add the last track segment
             sequence_list.append([current_node, arrival_time, None])
 
-            return pd.DataFrame(sequence_list)
+            return pd.DataFrame(sequence_list, columns=['node_name', 'arrival_time', 'departure_time'])
     
     
-        def calc_sequence(sequence_df):
-            for index, row in sequence_df.iterrows():
-                raise NotImplementedError()
+        def calc_sequence(sequence_df,track_df):
+            sequence_time_list = []
+            sequence_time_list.append([0, 0, 0])
+            for index_sequence_df, row in sequence_df.iterrows():
+                if index_sequence_df == 0:
+                    continue
+                if row['node_name'] is None:
+                    continue
+
+                if row['departure_time'] is None:
+                    rest_time_inside_node = 0
+                else:
+                    rest_time_inside_node = (row['departure_time'] - row['arrival_time']).total_seconds()
+
+                rest_time_outside_node = 0
+                walk_start_time = sequence_df.iloc[index_sequence_df-1]['departure_time']
+                walk_end_time = row['arrival_time']
+                walk_start_time_index = track_df[track_df['time'] == walk_start_time].index[0]
+                walk_end_time_index = track_df[track_df['time'] == walk_end_time].index[0]
+                for index_track_df in range(walk_start_time_index+1, walk_end_time_index):
+                    if track_df.iloc[index_track_df]['rest']:
+                        rest_time_outside_node += track_df.iloc[index_track_df]['time_diff']
+
+                
+                walk_time = (walk_end_time - walk_start_time).total_seconds() - rest_time_outside_node
+
+                sequence_time_list.append([rest_time_outside_node/60, rest_time_inside_node/60, walk_time/60])
+            return pd.merge(sequence_df, pd.DataFrame(sequence_time_list, columns=['rest_time_outside_node', 'rest_time_inside_node', 'walk_time']), left_index=True, right_index=True)
+        
+        def gen(df):
+            """
+            Generate track sequence dataframe from track points
+
+            Parameters
+            ----------
+            df : pandas.DataFrame
+                [latitude   longitude   elevation   time    time_diff   rest    reach]
+
+            Returns
+            -------
+            df : pandas.DataFrame
+                [node_name  arrival_time    departure_time  rest_time_outside_node  rest_time_inside_node   walk_time]
+            """
+            sequence_df = processor.sequence_generator.calc_time(df)
+            return processor.sequence_generator.calc_sequence(sequence_df, df)
         
 
 class graph_visualization:
@@ -124,11 +152,11 @@ if __name__ == '__main__':
     gpx_file = gpx_driver.GPXDriver(file_path)
     df = gpx_file.get_track_points()
 
-    rest_threshold = 200 # [s]
-    reach_node_threshold = 30 # [m]
+    rest_threshold = 239 # [s]
+    reach_node_threshold = 50 # [m]
     processor.rest_detection(df, rest_threshold)
     processor.calc_reach_node(df, reach_node_threshold)
-    sequence_df = processor.sequence_generator.calc_time(df)
+    # pd.set_option('display.max_rows', None)
+    # print(df)
+    sequence_df = processor.sequence_generator.gen(df)
     print(sequence_df)
-    # print(processor.sequence_generator.timetable(df))
-    # print(processor.generate_track_sequence_sentence(df))
