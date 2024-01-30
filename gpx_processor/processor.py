@@ -20,7 +20,7 @@ class processor:
         Parameters
         ----------
         df : pandas.DataFrame
-            DataFrame of track points
+            [latitude   longitude   elevation   time]
         threshold : int [s]
         """
         df['time_diff'] = df['time'].diff().dt.total_seconds()
@@ -33,7 +33,7 @@ class processor:
         Parameters
         ----------
         track_df : pandas.DataFrame
-            DataFrame of track points
+            [latitude   longitude   elevation   time    time_diff   rest]
         threshold : int [m]
         """
 
@@ -47,6 +47,50 @@ class processor:
                 if distance < threshold:
                     df.at[track_index, 'reach'] = node_row['name']
                     break
+
+    class sequence_generator:
+        """
+            Generate track sequence dataframe from track points
+
+            Parameters
+            ----------
+            df : pandas.DataFrame
+                [latitude   longitude   elevation   time    time_diff   rest    reach]
+
+            Returns
+            -------
+            df : pandas.DataFrame
+                [node_name arrival_time departure_time ]
+        """
+        def calc_time(df):
+            if len(df) == 0:
+                return pd.DataFrame(columns=['node_name', 'arrival_time', 'departure_time'])
+
+            sequence_df = pd.DataFrame(columns=['node_name', 'arrival_time', 'departure_time'])
+
+            current_node = df.iloc[0]['reach']
+            arrival_time = None
+            departure_time = df.iloc[0]['time']
+
+            for _, row in df.iterrows():
+                if row['reach'] is not None:
+                    if row['reach'] != current_node or row['reach'] is None:
+                        sequence_df = sequence_df._append({'node_name': current_node, 'arrival_time': arrival_time, 'departure_time': departure_time}, ignore_index=True)
+                        current_node = row['reach']
+                        arrival_time = row['time']
+                    else:
+                        departure_time = row['time']
+
+            # Add the last track segment
+            sequence_df = sequence_df._append({'node_name': current_node, 'arrival_time': arrival_time, 'departure_time': None}, ignore_index=True)
+
+            return sequence_df
+    
+    
+        def calc_sequence(sequence_df):
+            for index, row in sequence_df.iterrows():
+                raise NotImplementedError()
+        
 
 class graph_visualization:
     def plot_track_with_rest(df):
@@ -75,9 +119,11 @@ if __name__ == '__main__':
     gpx_file = gpx_driver.GPXDriver(file_path)
     df = gpx_file.get_track_points()
 
-    rest_threshold = 100 # [s]
+    rest_threshold = 200 # [s]
     reach_node_threshold = 30 # [m]
     processor.rest_detection(df, rest_threshold)
-    processor.calc_reach_node(df, 30)
+    processor.calc_reach_node(df, reach_node_threshold)
     pd.set_option('display.max_rows', None)
-    print(df)
+    #print(df)
+    print(processor.sequence_generator.timetable(df))
+    #print(processor.generate_track_sequence_sentence(df))
