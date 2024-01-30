@@ -38,8 +38,3 @@ class GPXDriver:
 
         df = pd.DataFrame(data)
         return df
-    
-if __name__ == '__main__':
-    gpx_file = GPXDriver("yamap_2022-07-29_08_17.gpx")
-    print(gpx_file.get_name())
-    print(gpx_file.get_track_points())
