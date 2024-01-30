@@ -40,13 +40,17 @@ class processor:
         nodelist = pd.read_csv('nodelist.csv')
         track_df['reach'] = None
 
+        rough_threshold = 0.00001098901 * threshold # 1m = 0.00001098901
+
         for track_index, track_row in track_df.iterrows():
             for _, node_row in nodelist.iterrows():
                 # Iterate over each row in the nodelist
-                distance = geodesic((track_row['latitude'], track_row['longitude']), (node_row['latitude'], node_row['longitude'])).meters
-                if distance < threshold:
-                    df.at[track_index, 'reach'] = node_row['name']
-                    break
+                if (track_row['latitude'] - rough_threshold < node_row['latitude'] < track_row['latitude'] + rough_threshold):
+                    if(track_row['longitude'] - rough_threshold < node_row['longitude'] < track_row['longitude'] + rough_threshold):
+                        distance = geodesic((track_row['latitude'], track_row['longitude']), (node_row['latitude'], node_row['longitude'])).meters
+                        if distance < threshold:
+                            df.at[track_index, 'reach'] = node_row['name']
+                            break
 
     class sequence_generator:
         """
@@ -66,7 +70,8 @@ class processor:
             if len(df) == 0:
                 return pd.DataFrame(columns=['node_name', 'arrival_time', 'departure_time'])
 
-            sequence_df = pd.DataFrame(columns=['node_name', 'arrival_time', 'departure_time'])
+            sequence_list = []
+            sequence_list.append(['node_name', 'arrival_time', 'departure_time'])
 
             current_node = df.iloc[0]['reach']
             arrival_time = None
@@ -75,16 +80,16 @@ class processor:
             for _, row in df.iterrows():
                 if row['reach'] is not None:
                     if row['reach'] != current_node or row['reach'] is None:
-                        sequence_df = sequence_df._append({'node_name': current_node, 'arrival_time': arrival_time, 'departure_time': departure_time}, ignore_index=True)
+                        sequence_list.append([current_node, arrival_time, departure_time])
                         current_node = row['reach']
                         arrival_time = row['time']
                     else:
                         departure_time = row['time']
 
             # Add the last track segment
-            sequence_df = sequence_df._append({'node_name': current_node, 'arrival_time': arrival_time, 'departure_time': None}, ignore_index=True)
+            sequence_list.append([current_node, arrival_time, None])
 
-            return sequence_df
+            return pd.DataFrame(sequence_list)
     
     
         def calc_sequence(sequence_df):
@@ -123,7 +128,7 @@ if __name__ == '__main__':
     reach_node_threshold = 30 # [m]
     processor.rest_detection(df, rest_threshold)
     processor.calc_reach_node(df, reach_node_threshold)
-    pd.set_option('display.max_rows', None)
-    #print(df)
-    print(processor.sequence_generator.timetable(df))
-    #print(processor.generate_track_sequence_sentence(df))
+    sequence_df = processor.sequence_generator.calc_time(df)
+    print(sequence_df)
+    # print(processor.sequence_generator.timetable(df))
+    # print(processor.generate_track_sequence_sentence(df))
