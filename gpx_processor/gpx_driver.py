@@ -18,9 +18,12 @@ purpose: gpx -> pandas.DataFrame
 class GPXDriver:
     ns ={'gpx': 'http://www.topografix.com/GPX/1/1'}
 
-    def  __init__(self,file_path):
+    def open_file(self,file_path):
         tree = ET.parse(file_path)
         self.root = tree.getroot()
+
+    def open_string(self, data_str):
+         self.root = ET.fromstring(data_str)
     
     def get_name(self):
         return self.root.find('.//gpx:name', namespaces=self.ns).text
