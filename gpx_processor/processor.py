@@ -149,8 +149,12 @@ if __name__ == '__main__':
     # file_path = 'gpx_files/yamap_2022-07-29_08_17.gpx'
     # file_path = 'gpx_files/yamap_2023-12-28_08_51.gpx'
     file_path = 'gpx_files/yamap_2023-07-29_05_24.gpx'
-    gpx_file = gpx_driver.GPXDriver(file_path)
-    df = gpx_file.get_track_points()
+    data_read = open(file_path, 'r', encoding="utf-8")
+    data_read_str = data_read.read()
+
+    calc_gpx_driver = gpx_driver.GPXDriver()
+    gpx_file = calc_gpx_driver.open_string(data_read_str)
+    df = calc_gpx_driver.get_track_points()
 
     rest_threshold = 239 # [s]
     reach_node_threshold = 50 # [m]
